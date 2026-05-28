@@ -123,7 +123,7 @@ public class TCPClientImpl implements TCPClient {
 
     @Override
     public void send(ChessCommand commandResponse) {
-        if (!running) {
+        if (!running || out == null) {
             System.err.println("Client is not connected");
             return;
         }
@@ -202,7 +202,7 @@ public class TCPClientImpl implements TCPClient {
     private void abruptShutdown() {
         try {
             if (socket != null && !socket.isClosed()) {
-                socket.setSoLinger(true, 0);  // RST!
+                socket.setSoLinger(true, 0);
                 socket.close();
             }
         } catch (Exception e) {
@@ -251,6 +251,6 @@ public class TCPClientImpl implements TCPClient {
     }
 
     private void onApplicationStop(ApplicationStopEvent event) {
-        exitAbruptly();  // крестик → RST
+        exitAbruptly();
     }
 }

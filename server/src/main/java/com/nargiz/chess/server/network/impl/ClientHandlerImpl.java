@@ -59,11 +59,11 @@ public class ClientHandlerImpl implements ClientHandler {
                 try {
                     String line = reader.readLine();
                     if (line == null) {
+                        System.out.println("Client " + userId + " disconnected (EOF - FIN)");
                         break;
                     }
 
                     System.out.println("User: %s  Received: %s".formatted(userId, line));
-
 
                     Envelope request = mapper.readValue(line, Envelope.class);
 
@@ -84,21 +84,30 @@ public class ClientHandlerImpl implements ClientHandler {
 
                 } catch (SocketTimeoutException e) {
                     continue;
+                } catch (IOException e) {
+                    // RST или другое IO исключение - разрыв соединения
+                    System.out.println("Client " + userId + " disconnected (IO error): " + e.getMessage());
+                    break;
                 } catch (Exception e) {
-                    System.out.println("JSON parsing error: %s".formatted(e.getMessage()));
+                    System.err.println("Unexpected error for client " + userId + ": " + e.getMessage());
                 }
             }
 
         } catch (IOException e) {
             System.out.println("Client handler error: %s".formatted(e.getMessage()));
         } finally {
-            onStop.accept(userId);
+            if (onStop != null) {
+                onStop.accept(userId);
+            }
         }
         System.out.println("Client disconnected: %s".formatted(clientSocket.getRemoteSocketAddress()));
     }
 
     @Override
     public void send(ChessCommand command) {
+        if (writer == null) {
+            return;
+        }
         Map<String, Object> commandBody = mapper.convertValue(command, BODY_OBJECT.getClass());
 
         Envelope response = new Envelope(command.getClass().getSimpleName(), commandBody);
@@ -130,6 +139,13 @@ public class ClientHandlerImpl implements ClientHandler {
     @Override
     public void stop() {
         running = false;
+        try {
+            if (clientSocket != null && !clientSocket.isClosed()) {
+                clientSocket.close();
+            }
+        } catch (IOException e) {
+            System.err.println("Error closing socket: " + e.getMessage());
+        }
     }
 
     @Override
@@ -137,6 +153,7 @@ public class ClientHandlerImpl implements ClientHandler {
         ServerCommandProcessor processor = processorsMap.get(command.getClass());
         if (processor == null) {
             System.out.println("Processor not found: " + command.getClass());
+            return null;
         }
         ChessCommandResponse response = processor.processCommand(command);
         if (response != null) {
