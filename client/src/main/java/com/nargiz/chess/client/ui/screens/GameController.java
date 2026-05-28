@@ -200,12 +200,14 @@ public class GameController extends BaseController {
 
     @FXML
     public void exit() {
-        System.out.println("Exit button clicked - calling stopNormally()");
-        if (tcpClient instanceof TCPClientImpl) {
-            ((TCPClientImpl) tcpClient).stopNormally();
-        } else if (tcpClient != null) {
-            tcpClient.stop();
+        System.out.println(">>> EXIT BUTTON PRESSED <<<");
+        System.out.println("tcpClient = " + tcpClient);
+        if (tcpClient == null) {
+            System.out.println("tcpClient is NULL!");
+            navigateTo(mainScreenController);
+            return;
         }
+        tcpClient.stopNormally();
         navigateTo(mainScreenController);
     }
 
