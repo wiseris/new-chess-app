@@ -10,6 +10,7 @@ import com.nargiz.chess.client.network.TCPClient;
 import com.nargiz.chess.client.process.ClientCommandProcessor;
 import com.nargiz.chess.shared.command.ChessCommand;
 import com.nargiz.chess.shared.command.Envelope;
+import com.nargiz.chess.shared.command.response.ErrorResponse;
 import com.nargiz.chess.shared.events.ApplicationEventBus;
 import com.nargiz.chess.shared.fabric.ChessCommandFabric;
 import com.nargiz.chess.shared.ioc.anotation.Component;
@@ -43,7 +44,6 @@ public class TCPClientImpl implements TCPClient {
     private ServerInfo serverInfo;
     private boolean running;
     private Socket socket;
-
     private UUID userId;
 
     @Inject
@@ -56,7 +56,6 @@ public class TCPClientImpl implements TCPClient {
     private ApplicationEventBus eventBus;
 
     private Map<Class<? extends ClientCommandProcessor>, ClientCommandProcessor> processorsMap;
-
 
     @Override
     public CompletableFuture<Void> start(ServerInfo serverInfo) {
@@ -139,9 +138,32 @@ public class TCPClientImpl implements TCPClient {
     private Socket createSocketWithTimeout(String address, int port, int timeout) throws IOException {
         Socket socket = new Socket();
         socket.setSoTimeout(timeout);
-        socket.setSoLinger(true, 0);
         socket.connect(new InetSocketAddress(address, port), timeout);
         return socket;
+    }
+
+    private void closeWithRst() {
+        if (socket != null && !socket.isClosed()) {
+            try {
+                socket.setSoLinger(true, 0);
+                socket.close();
+                System.out.println("Socket closed with RST");
+            } catch (IOException e) {
+                System.err.println("Error closing socket with RST: " + e.getMessage());
+            }
+        }
+    }
+
+    private void closeWithFin() {
+        if (socket != null && !socket.isClosed()) {
+            try {
+                socket.setSoLinger(false, 0);
+                socket.close();
+                System.out.println("Socket closed with FIN");
+            } catch (IOException e) {
+                System.err.println("Error closing socket with FIN: " + e.getMessage());
+            }
+        }
     }
 
     @Override
@@ -150,15 +172,28 @@ public class TCPClientImpl implements TCPClient {
             return;
         }
         running = false;
+        closeWithRst();
+    }
 
-        if (socket != null && !socket.isClosed()) {
+    @Override
+    public void stopNormally() {
+        if (!running) {
+            return;
+        }
+
+        if (out != null && running) {
             try {
-                socket.close();
-                System.out.println("Socket closed with RST");
-            } catch (IOException e) {
-                System.err.println("Error closing socket: " + e.getMessage());
+                ErrorResponse disconnect = new ErrorResponse("Player disconnected");
+                disconnect.setUserId(userId);
+                send(disconnect);
+                Thread.sleep(100);
+            } catch (Exception e) {
+                System.err.println("Failed to send disconnect: " + e.getMessage());
             }
         }
+
+        running = false;
+        closeWithFin();
     }
 
     @PostConstruct

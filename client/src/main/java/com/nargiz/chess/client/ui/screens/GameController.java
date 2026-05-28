@@ -5,6 +5,7 @@ import com.nargiz.chess.client.model.events.ErrorEvent;
 import com.nargiz.chess.client.model.events.StartGameEvent;
 import com.nargiz.chess.client.model.events.UpdateGameStateEvent;
 import com.nargiz.chess.client.network.TCPClient;
+import com.nargiz.chess.client.network.impl.TCPClientImpl;
 import com.nargiz.chess.client.ui.BaseController;
 import com.nargiz.chess.client.ui.dialogs.DialogSelectTransformationController;
 import com.nargiz.chess.client.ui.dialogs.DialogStateController;
@@ -117,12 +118,12 @@ public class GameController extends BaseController {
         };
 
         ImageView image = new ImageView(switch (data.getFigureType()) {
-                    case KING -> figurePattern.formatted("king");
-                    case QUEEN -> figurePattern.formatted("queen");
-                    case BISHOP -> figurePattern.formatted("bishop");
-                    case KNIGHT -> figurePattern.formatted("knight");
-                    case ROOK -> figurePattern.formatted("rook");
-                    case PAWN -> figurePattern.formatted("pawn");
+            case KING -> figurePattern.formatted("king");
+            case QUEEN -> figurePattern.formatted("queen");
+            case BISHOP -> figurePattern.formatted("bishop");
+            case KNIGHT -> figurePattern.formatted("knight");
+            case ROOK -> figurePattern.formatted("rook");
+            case PAWN -> figurePattern.formatted("pawn");
         });
 
         image.fitHeightProperty().set(25);
@@ -199,9 +200,14 @@ public class GameController extends BaseController {
 
     @FXML
     public void exit() {
-        tcpClient.stop();
+        if (tcpClient instanceof TCPClientImpl) {
+            ((TCPClientImpl) tcpClient).stopNormally();
+        } else {
+            tcpClient.stop();
+        }
         navigateTo(mainScreenController);
     }
+
     private void resizeBoard(double width, double height) {
         double scaleX = width / baseSceneSizeX;
         double scaleY = height / baseSceneSizeY;
@@ -242,7 +248,7 @@ public class GameController extends BaseController {
                             .fromPosition(oldPosition)
                             .toPosition(newPosition)
                             .build()
-                    );
+            );
 
             System.out.printf("Position: %s, %s%n", col, row);
             e.setDropCompleted(true);
