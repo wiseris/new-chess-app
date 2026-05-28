@@ -143,36 +143,22 @@ public class TCPClientImpl implements TCPClient {
         return socket;
     }
 
-    private void closeWithRst() {
-        if (socket != null && !socket.isClosed()) {
-            try {
-                socket.close();
-                System.out.println("Socket closed with RST");
-            } catch (IOException e) {
-                System.err.println("Error closing socket with RST: " + e.getMessage());
-            }
-        }
-    }
-
-    private void closeWithFin() {
-        if (socket != null && !socket.isClosed()) {
-            try {
-                socket.setSoLinger(false, 0);
-                socket.close();
-                System.out.println("Socket closed with FIN");
-            } catch (IOException e) {
-                System.err.println("Error closing socket with FIN: " + e.getMessage());
-            }
-        }
-    }
-
     @Override
     public void stop() {
         if (!running) {
             return;
         }
         running = false;
-        closeWithRst();
+
+        if (socket != null && !socket.isClosed()) {
+            try {
+                socket.setSoLinger(true, 0);
+                socket.close();
+                System.out.println("Socket closed with RST");
+            } catch (IOException e) {
+                System.err.println("Error closing socket: " + e.getMessage());
+            }
+        }
     }
 
     @Override
@@ -193,7 +179,16 @@ public class TCPClientImpl implements TCPClient {
         }
 
         running = false;
-        closeWithFin();
+
+        if (socket != null && !socket.isClosed()) {
+            try {
+                socket.setSoLinger(false, 0);
+                socket.close();
+                System.out.println("Socket closed with FIN");
+            } catch (IOException e) {
+                System.err.println("Error closing socket: " + e.getMessage());
+            }
+        }
     }
 
     @PostConstruct
