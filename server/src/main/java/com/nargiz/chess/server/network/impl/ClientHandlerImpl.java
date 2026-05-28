@@ -59,11 +59,11 @@ public class ClientHandlerImpl implements ClientHandler {
                 try {
                     String line = reader.readLine();
                     if (line == null) {
+                        System.out.println("Client " + userId + " disconnected (EOF)");
                         break;
                     }
 
                     System.out.println("User: %s  Received: %s".formatted(userId, line));
-
 
                     Envelope request = mapper.readValue(line, Envelope.class);
 
@@ -84,6 +84,9 @@ public class ClientHandlerImpl implements ClientHandler {
 
                 } catch (SocketTimeoutException e) {
                     continue;
+                } catch (IOException e) {
+                    System.out.println("Client " + userId + " connection lost: " + e.getMessage());
+                    break;
                 } catch (Exception e) {
                     System.out.println("JSON parsing error: %s".formatted(e.getMessage()));
                 }
@@ -92,7 +95,9 @@ public class ClientHandlerImpl implements ClientHandler {
         } catch (IOException e) {
             System.out.println("Client handler error: %s".formatted(e.getMessage()));
         } finally {
-            onStop.accept(userId);
+            if (onStop != null) {
+                onStop.accept(userId);
+            }
         }
         System.out.println("Client disconnected: %s".formatted(clientSocket.getRemoteSocketAddress()));
     }
@@ -137,6 +142,7 @@ public class ClientHandlerImpl implements ClientHandler {
         ServerCommandProcessor processor = processorsMap.get(command.getClass());
         if (processor == null) {
             System.out.println("Processor not found: " + command.getClass());
+            return null;
         }
         ChessCommandResponse response = processor.processCommand(command);
         if (response != null) {
