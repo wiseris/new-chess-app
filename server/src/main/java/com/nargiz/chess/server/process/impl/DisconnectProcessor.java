@@ -21,10 +21,6 @@ public class DisconnectProcessor implements ServerCommandProcessor<Disconnect, C
 
         System.out.println(message);
 
-        String reason = command.isGraceful()
-                ? (command.getReason() != null ? command.getReason() : "Player left the game")
-                : "Connection reset (RST)";
-
         gameService.removeMember(command.getUserId());
 
         return null;

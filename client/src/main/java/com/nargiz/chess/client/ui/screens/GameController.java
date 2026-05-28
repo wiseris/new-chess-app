@@ -5,6 +5,7 @@ import com.nargiz.chess.client.model.events.ErrorEvent;
 import com.nargiz.chess.client.model.events.StartGameEvent;
 import com.nargiz.chess.client.model.events.UpdateGameStateEvent;
 import com.nargiz.chess.client.network.TCPClient;
+import com.nargiz.chess.client.network.impl.TCPClientImpl;
 import com.nargiz.chess.client.ui.BaseController;
 import com.nargiz.chess.client.ui.dialogs.DialogSelectTransformationController;
 import com.nargiz.chess.client.ui.dialogs.DialogStateController;
@@ -24,6 +25,7 @@ import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.geometry.HPos;
 import javafx.geometry.VPos;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -200,9 +202,8 @@ public class GameController extends BaseController {
     @FXML
     public void exit() {
         System.out.println("Exit button clicked - sending FIN");
-        // Приводим к реализации для вызова exitGracefully()
-        if (tcpClient instanceof com.nargiz.chess.client.network.impl.TCPClientImpl) {
-            ((com.nargiz.chess.client.network.impl.TCPClientImpl) tcpClient).exitGracefully();
+        if (tcpClient instanceof TCPClientImpl) {
+            ((TCPClientImpl) tcpClient).exitGracefully();
         } else {
             tcpClient.stop();
         }
@@ -211,7 +212,6 @@ public class GameController extends BaseController {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-
         navigateTo(mainScreenController);
     }
 
@@ -312,10 +312,21 @@ public class GameController extends BaseController {
         });
     }
 
+    private void onError(ErrorEvent event) {
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("Game");
+            alert.setHeaderText(null);
+            alert.setContentText(event.getMessage());
+            alert.showAndWait();
+        });
+    }
+
     @PostConstruct
     private void initEvents() {
         applicationEventBus.subscribeOn(StartGameEvent.class, this::onStartGame);
         applicationEventBus.subscribeOn(UpdateGameStateEvent.class, this::onGameStateChange);
+        applicationEventBus.subscribeOn(ErrorEvent.class, this::onError);
     }
 
     private void onGameStateChange(UpdateGameStateEvent event) {
