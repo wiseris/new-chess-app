@@ -206,6 +206,12 @@ public class GameController extends BaseController {
         } else {
             tcpClient.stop();
         }
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
         navigateTo(mainScreenController);
     }
 

@@ -163,7 +163,7 @@ public class TCPClientImpl implements TCPClient {
             return;
         }
 
-        System.out.println(graceful ? "Graceful shutdown (FIN) initiated" : " Abrupt shutdown (RST) initiated");
+        System.out.println(graceful ? "Graceful shutdown (FIN) initiated" : "Abrupt shutdown (RST) initiated");
 
         running = false;
 
@@ -176,7 +176,7 @@ public class TCPClientImpl implements TCPClient {
 
     private void gracefulShutdown() {
         try {
-            System.out.println(" Sending Disconnect command...");
+            System.out.println("Sending Disconnect command...");
             if (out != null && userId != null) {
                 Disconnect disconnect = Disconnect.builder()
                         .userId(userId)
@@ -185,26 +185,27 @@ public class TCPClientImpl implements TCPClient {
                         .build();
                 send(disconnect);
                 out.flush();
-                System.out.println(" Disconnect command sent");
+                System.out.println("Disconnect command sent");
                 Thread.sleep(200);
             }
 
             System.out.println("Closing output stream...");
             if (out != null) {
                 out.close();
-                System.out.println(" Output stream closed");
+                System.out.println("Output stream closed");
             }
 
-            System.out.println(" Shutting down socket output...");
+            System.out.println("Shutting down socket output...");
             if (socket != null && !socket.isClosed()) {
                 socket.shutdownOutput();
-                System.out.println(" Socket output shutdown (FIN sent)");
+                System.out.println("Socket output shutdown (FIN sent)");
                 Thread.sleep(100);
                 socket.close();
                 System.out.println("Socket closed");
             }
 
-            System.out.println(" Graceful shutdown completed");
+            System.out.println("Graceful shutdown completed");
+
         } catch (Exception e) {
             System.err.println("Error during graceful shutdown: " + e.getMessage());
             abruptShutdown();
@@ -213,16 +214,26 @@ public class TCPClientImpl implements TCPClient {
 
     private void abruptShutdown() {
         try {
-            System.out.println("Interrupting connection thread...");
+            System.out.println("Abrupt shutdown - closing socket with RST...");
+
+            if (socket != null && !socket.isClosed()) {
+                socket.setSoLinger(true, 0);
+                socket.close();
+                System.out.println("Socket closed with SO_LINGER=0 (RST should be sent)");
+
+                if (!socket.isClosed()) {
+                    socket.shutdownOutput();
+                    socket.close();
+                    System.out.println("Additional shutdownOutput performed");
+                }
+            } else {
+                System.out.println("Socket is null or already closed");
+            }
+
             if (connectionThread != null && connectionThread.isAlive()) {
                 connectionThread.interrupt();
             }
 
-            System.out.println(" Closing socket abruptly...");
-            if (socket != null && !socket.isClosed()) {
-                socket.close();
-                System.out.println(" Socket closed (RST should be sent)");
-            }
         } catch (Exception e) {
             System.err.println("Error during abrupt shutdown: " + e.getMessage());
         }
