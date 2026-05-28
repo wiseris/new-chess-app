@@ -138,6 +138,7 @@ public class TCPClientImpl implements TCPClient {
     private Socket createSocketWithTimeout(String address, int port, int timeout) throws IOException {
         Socket socket = new Socket();
         socket.setSoTimeout(timeout);
+        socket.setSoLinger(true, 0);
         socket.connect(new InetSocketAddress(address, port), timeout);
         return socket;
     }
@@ -145,7 +146,6 @@ public class TCPClientImpl implements TCPClient {
     private void closeWithRst() {
         if (socket != null && !socket.isClosed()) {
             try {
-                socket.setSoLinger(true, 0);
                 socket.close();
                 System.out.println("Socket closed with RST");
             } catch (IOException e) {
