@@ -138,7 +138,6 @@ public class TCPClientImpl implements TCPClient {
     private Socket createSocketWithTimeout(String address, int port, int timeout) throws IOException {
         Socket socket = new Socket();
         socket.setSoTimeout(timeout);
-        socket.setSoLinger(true, 0);
         socket.connect(new InetSocketAddress(address, port), timeout);
         return socket;
     }
@@ -172,7 +171,7 @@ public class TCPClientImpl implements TCPClient {
                 ErrorResponse disconnect = new ErrorResponse("Player disconnected");
                 disconnect.setUserId(userId);
                 send(disconnect);
-                Thread.sleep(100);
+                Thread.sleep(200);
             } catch (Exception e) {
                 System.err.println("Failed to send disconnect: " + e.getMessage());
             }
@@ -182,7 +181,6 @@ public class TCPClientImpl implements TCPClient {
 
         if (socket != null && !socket.isClosed()) {
             try {
-                socket.setSoLinger(false, 0);
                 socket.close();
                 System.out.println("Socket closed with FIN");
             } catch (IOException e) {
