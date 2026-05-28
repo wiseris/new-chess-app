@@ -181,6 +181,7 @@ public class TCPClientImpl implements TCPClient {
 
         if (socket != null && !socket.isClosed()) {
             try {
+                socket.shutdownOutput();
                 socket.close();
                 System.out.println("Socket closed with FIN");
             } catch (IOException e) {
