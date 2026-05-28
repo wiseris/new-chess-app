@@ -162,16 +162,19 @@ public class TCPClientImpl implements TCPClient {
 
     @Override
     public void stopNormally() {
+        System.out.println("stopNormally() called, running=" + running);
         if (!running) {
             return;
         }
 
-        if (out != null && running) {
+        if (out != null) {
             try {
+                System.out.println("Sending disconnect message");
                 ErrorResponse disconnect = new ErrorResponse("Player disconnected");
                 disconnect.setUserId(userId);
                 send(disconnect);
-                Thread.sleep(200);
+                Thread.sleep(500);
+                out.flush();
             } catch (Exception e) {
                 System.err.println("Failed to send disconnect: " + e.getMessage());
             }
@@ -181,12 +184,14 @@ public class TCPClientImpl implements TCPClient {
 
         if (socket != null && !socket.isClosed()) {
             try {
-                socket.shutdownOutput();
+                socket.setSoLinger(false, 0);
                 socket.close();
                 System.out.println("Socket closed with FIN");
             } catch (IOException e) {
                 System.err.println("Error closing socket: " + e.getMessage());
             }
+        } else {
+            System.out.println("Socket is null or already closed");
         }
     }
 
