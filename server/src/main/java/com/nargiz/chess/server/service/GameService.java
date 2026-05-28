@@ -19,4 +19,6 @@ public interface GameService {
     boolean isHost(UUID userId);
 
     void performGameAction(ActionCommand command);
+
+    void notifyDisconnect(UUID disconnectedUserId, String message);
 }

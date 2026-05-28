@@ -2,6 +2,7 @@ package com.nargiz.chess.server.service.impl;
 
 import com.nargiz.chess.server.events.MemberDisconnectedEvent;
 import com.nargiz.chess.server.exceptions.ServiceException;
+import com.nargiz.chess.shared.command.response.ErrorResponse;
 import com.nargiz.chess.server.network.TCPServer;
 import com.nargiz.chess.server.repository.ServerRepository;
 import com.nargiz.chess.server.service.GameService;
@@ -52,6 +53,17 @@ public class GameServiceImpl implements GameService {
 
         Set<MemberData> members = serverRepository.getMemberList(hostId);
         broadcastLobby(hostId, new UpdateMembers(members));
+    }
+    @Override
+    public void notifyDisconnect(UUID disconnectedUserId, String message) {
+        LobbyData lobby = serverRepository.getLobbyByMember(disconnectedUserId);
+        if (lobby == null) return;
+
+        Set<UUID> otherPlayers = new HashSet<>(lobby.getMembers().keySet());
+        otherPlayers.add(lobby.getHost().getId());
+        otherPlayers.remove(disconnectedUserId);
+
+        server.broadcast(otherPlayers, new ErrorResponse(message));
     }
 
     @Override

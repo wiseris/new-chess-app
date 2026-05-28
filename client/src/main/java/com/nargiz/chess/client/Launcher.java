@@ -35,7 +35,7 @@ public class Launcher extends Application {
     }
 
     private void onWindowClose(WindowEvent event) {
-        System.out.println("Window close button (X) clicked - sending RST");
+        System.out.println("Window close button (X) clicked - sending Disconnect");
 
         if (tcpClient != null) {
             tcpClient.exitAbruptly();
@@ -45,16 +45,13 @@ public class Launcher extends Application {
             eventBus.publish(new ApplicationStopEvent());
         }
 
-        Platform.runLater(() -> {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-            Platform.exit();
-        });
+        try {
+            Thread.sleep(200);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
 
-        event.consume();
+        Platform.exit();
     }
 
     public static void main(String[] args) {
