@@ -5,7 +5,6 @@ import com.nargiz.chess.client.model.events.ErrorEvent;
 import com.nargiz.chess.client.model.events.StartGameEvent;
 import com.nargiz.chess.client.model.events.UpdateGameStateEvent;
 import com.nargiz.chess.client.network.TCPClient;
-import com.nargiz.chess.client.network.impl.TCPClientImpl;
 import com.nargiz.chess.client.ui.BaseController;
 import com.nargiz.chess.client.ui.dialogs.DialogSelectTransformationController;
 import com.nargiz.chess.client.ui.dialogs.DialogStateController;
@@ -200,17 +199,9 @@ public class GameController extends BaseController {
 
     @FXML
     public void exit() {
-        System.out.println(">>> EXIT BUTTON PRESSED <<<");
-        System.out.println("tcpClient = " + tcpClient);
-        if (tcpClient == null) {
-            System.out.println("tcpClient is NULL!");
-            navigateTo(mainScreenController);
-            return;
-        }
-        tcpClient.stopNormally();
+        tcpClient.stop();
         navigateTo(mainScreenController);
     }
-
     private void resizeBoard(double width, double height) {
         double scaleX = width / baseSceneSizeX;
         double scaleY = height / baseSceneSizeY;

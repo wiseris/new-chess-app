@@ -11,5 +11,4 @@ public interface TCPClient {
     CompletableFuture<Void> start(ServerInfo serverInfo);
     void stop();
     UUID getUserId();
-    void stopNormally();
 }

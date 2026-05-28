@@ -104,8 +104,8 @@ public class TCPServerImpl implements TCPServer {
         processorsMap = processors.stream()
                 .collect(
                         Collectors.toMap(
-                            ServerCommandProcessor::getCommandClass,
-                            Function.identity()
+                                ServerCommandProcessor::getCommandClass,
+                                Function.identity()
                         )
                 );
         eventBus.subscribeOn(ApplicationStopEvent.class, this::onApplicationStop);
