@@ -41,10 +41,11 @@ public class TCPClientImpl implements TCPClient {
     private ObjectMapper mapper = new ObjectMapper();
     private PrintWriter out;
     private ServerInfo serverInfo;
-    private boolean running;
+    private volatile boolean running;
     private Socket socket;
     private UUID userId;
     private Thread connectionThread;
+    private BufferedReader reader;
 
     @Inject
     private ChessCommandFabric commandFabric;
@@ -71,24 +72,19 @@ public class TCPClientImpl implements TCPClient {
         System.out.println("TCP Client is on");
         System.out.println("Connecting to " + serverInfo.getAddress() + ":" + serverInfo.getPort());
 
-        Socket newSocket = null;
-        BufferedReader in = null;
-        PrintWriter out = null;
-
         try {
-            newSocket = createSocketWithTimeout(serverInfo.getAddress(), serverInfo.getPort(), NETWORK_TIMEOUT);
-            in = new BufferedReader(new InputStreamReader(newSocket.getInputStream(), StandardCharsets.UTF_8));
+            Socket newSocket = createSocketWithTimeout(serverInfo.getAddress(), serverInfo.getPort(), NETWORK_TIMEOUT);
+            reader = new BufferedReader(new InputStreamReader(newSocket.getInputStream(), StandardCharsets.UTF_8));
             out = new PrintWriter(newSocket.getOutputStream(), true, StandardCharsets.UTF_8);
 
             System.out.println("Connected to server!");
             this.socket = newSocket;
-            this.out = out;
             signal.complete(null);
 
             while (running && !Thread.currentThread().isInterrupted()) {
                 String line = null;
                 try {
-                    line = in.readLine();
+                    line = reader.readLine();
                     if (line == null) {
                         System.out.println("Server closed connection (FIN)");
                         eventBus.publish(new DisconnectedEvent("Server closed connection", false, false));
@@ -112,7 +108,6 @@ public class TCPClientImpl implements TCPClient {
                 );
 
                 ClientCommandProcessor processor = processorsMap.get(command.getClass());
-                System.out.println("Processor:" + processor);
                 if (processor != null) {
                     processor.processCommand(command);
                 }
@@ -123,12 +118,13 @@ public class TCPClientImpl implements TCPClient {
             eventBus.publish(new DisconnectedEvent("Connection error: " + e.getMessage(), true, false));
         } finally {
             running = false;
+            System.out.println("Connection thread finished");
         }
     }
 
     @Override
     public void send(ChessCommand commandResponse) {
-        if (!running || out == null) {
+        if (out == null) {
             System.err.println("Client is not connected");
             return;
         }
@@ -159,13 +155,13 @@ public class TCPClientImpl implements TCPClient {
     }
 
     public void stop(boolean graceful) {
-        if (!running) {
-            return;
-        }
-
         System.out.println(graceful ? "Graceful shutdown (FIN) initiated" : "Abrupt shutdown (RST) initiated");
 
         running = false;
+
+        if (connectionThread != null && connectionThread.isAlive()) {
+            connectionThread.interrupt();
+        }
 
         if (graceful) {
             gracefulShutdown();
@@ -195,13 +191,16 @@ public class TCPClientImpl implements TCPClient {
                 System.out.println("Output stream closed");
             }
 
-            System.out.println("Shutting down socket output...");
+            System.out.println("Closing reader...");
+            if (reader != null) {
+                reader.close();
+                System.out.println("Reader closed");
+            }
+
+            System.out.println("Closing socket...");
             if (socket != null && !socket.isClosed()) {
-                socket.shutdownOutput();
-                System.out.println("Socket output shutdown (FIN sent)");
-                Thread.sleep(100);
                 socket.close();
-                System.out.println("Socket closed");
+                System.out.println("Socket closed (FIN sent)");
             }
 
             System.out.println("Graceful shutdown completed");
@@ -216,22 +215,16 @@ public class TCPClientImpl implements TCPClient {
         try {
             System.out.println("Abrupt shutdown - closing socket with RST...");
 
+            if (reader != null) {
+                reader.close();
+            }
+
             if (socket != null && !socket.isClosed()) {
                 socket.setSoLinger(true, 0);
                 socket.close();
                 System.out.println("Socket closed with SO_LINGER=0 (RST should be sent)");
-
-                if (!socket.isClosed()) {
-                    socket.shutdownOutput();
-                    socket.close();
-                    System.out.println("Additional shutdownOutput performed");
-                }
             } else {
                 System.out.println("Socket is null or already closed");
-            }
-
-            if (connectionThread != null && connectionThread.isAlive()) {
-                connectionThread.interrupt();
             }
 
         } catch (Exception e) {
@@ -262,8 +255,6 @@ public class TCPClientImpl implements TCPClient {
         eventBus.subscribeOn(ApplicationStopEvent.class, this::onApplicationStop);
         eventBus.subscribeOn(LobbyCreatedEvent.class, this::onLobbyCreated);
         eventBus.subscribeOn(JoinLobbyEvent.class, this::onJoinLobby);
-
-        System.out.println("Client processors map: " + processorsMap);
     }
 
     private void onJoinLobby(JoinLobbyEvent event) {
