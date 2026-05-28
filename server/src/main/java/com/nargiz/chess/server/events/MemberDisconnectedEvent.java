@@ -12,4 +12,14 @@ import java.util.UUID;
 @AllArgsConstructor
 public class MemberDisconnectedEvent implements GameEvent {
     private UUID memberId;
+    private boolean isRST;
+    private String reason;
+
+    public MemberDisconnectedEvent(UUID memberId) {
+        this(memberId, false, "Normal disconnection");
+    }
+
+    public MemberDisconnectedEvent(UUID memberId, boolean isRST) {
+        this(memberId, isRST, isRST ? "Connection reset (RST)" : "Normal disconnect (FIN)");
+    }
 }

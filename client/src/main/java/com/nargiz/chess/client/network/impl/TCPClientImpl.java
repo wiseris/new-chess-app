@@ -2,9 +2,10 @@ package com.nargiz.chess.client.network.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nargiz.chess.client.model.events.DisconnectedEvent;
 import com.nargiz.chess.client.model.events.JoinLobbyEvent;
 import com.nargiz.chess.client.model.events.LobbyCreatedEvent;
-import com.nargiz.chess.shared.command.CreateLobby;
+import com.nargiz.chess.shared.command.Disconnect;
 import com.nargiz.chess.shared.events.ApplicationStopEvent;
 import com.nargiz.chess.client.network.TCPClient;
 import com.nargiz.chess.client.process.ClientCommandProcessor;
@@ -41,7 +42,7 @@ public class TCPClientImpl implements TCPClient {
     private PrintWriter out;
     private ServerInfo serverInfo;
     private boolean running;
-
+    private Socket socket;
     private UUID userId;
 
     @Inject
@@ -54,7 +55,6 @@ public class TCPClientImpl implements TCPClient {
     private ApplicationEventBus eventBus;
 
     private Map<Class<? extends ClientCommandProcessor>, ClientCommandProcessor> processorsMap;
-
 
     @Override
     public CompletableFuture<Void> start(ServerInfo serverInfo) {
@@ -75,18 +75,27 @@ public class TCPClientImpl implements TCPClient {
                 PrintWriter out = new PrintWriter(socket.getOutputStream(), true, StandardCharsets.UTF_8);
         ) {
             System.out.println("Connected to server!");
+            this.socket = socket;
             this.out = out;
             signal.complete(null);
+
             while (running) {
                 String line = null;
                 try {
                     line = in.readLine();
                     if (line == null) {
+                        System.out.println("Server closed connection (FIN)");
+                        eventBus.publish(new DisconnectedEvent("Server closed connection", false, false));
                         break;
                     }
                 } catch (SocketTimeoutException e) {
                     continue;
+                } catch (IOException e) {
+                    System.out.println("Connection lost: " + e.getMessage());
+                    eventBus.publish(new DisconnectedEvent("Connection lost: " + e.getMessage(), true, false));
+                    break;
                 }
+
                 System.out.println("Received: %s".formatted(line));
 
                 Envelope request = mapper.readValue(line, Envelope.class);
@@ -101,17 +110,18 @@ public class TCPClientImpl implements TCPClient {
                 if (processor != null) {
                     processor.processCommand(command);
                 }
-
             }
 
         } catch (Exception e) {
             signal.completeExceptionally(e);
             System.err.println("Connection error: " + e.getMessage());
+            eventBus.publish(new DisconnectedEvent("Connection error: " + e.getMessage(), true, false));
         } finally {
             running = false;
         }
     }
 
+    @Override
     public void send(ChessCommand commandResponse) {
         if (!running) {
             System.err.println("Client is not connected");
@@ -130,7 +140,6 @@ public class TCPClientImpl implements TCPClient {
         } catch (JsonProcessingException e) {
             System.err.println("Command parsing error: " + e.getMessage());
         }
-
     }
 
     private Socket createSocketWithTimeout(String address, int port, int timeout) throws IOException {
@@ -141,7 +150,72 @@ public class TCPClientImpl implements TCPClient {
 
     @Override
     public void stop() {
+        stop(false);
+    }
+
+    public void stop(boolean graceful) {
+        if (!running) {
+            return;
+        }
+
+        System.out.println(graceful ? "Graceful shutdown (FIN) initiated" : "Abrupt shutdown (RST) initiated");
+
+        if (graceful) {
+            gracefulShutdown();
+        } else {
+            abruptShutdown();
+        }
+
         running = false;
+    }
+
+    private void gracefulShutdown() {
+        try {
+            if (out != null && userId != null) {
+                Disconnect disconnect = Disconnect.builder()
+                        .userId(userId)
+                        .reason("Player left the game")
+                        .graceful(true)
+                        .build();
+                send(disconnect);
+                out.flush();
+                Thread.sleep(200);
+            }
+
+            if (out != null) {
+                out.close();
+            }
+
+            if (socket != null && !socket.isClosed()) {
+                socket.shutdownOutput();
+                socket.close();
+            }
+
+            System.out.println("Graceful shutdown completed");
+
+        } catch (Exception e) {
+            System.err.println("Error during graceful shutdown: " + e.getMessage());
+            abruptShutdown();
+        }
+    }
+
+    private void abruptShutdown() {
+        try {
+            if (socket != null && !socket.isClosed()) {
+                socket.setSoLinger(true, 0);  // RST!
+                socket.close();
+            }
+        } catch (Exception e) {
+            System.err.println("Error during abrupt shutdown: " + e.getMessage());
+        }
+    }
+
+    public void exitGracefully() {
+        stop(true);
+    }
+
+    public void exitAbruptly() {
+        stop(false);
     }
 
     @PostConstruct
@@ -171,11 +245,12 @@ public class TCPClientImpl implements TCPClient {
         userId = event.getUserId();
     }
 
+    @Override
     public UUID getUserId() {
         return userId;
     }
 
     private void onApplicationStop(ApplicationStopEvent event) {
-        stop();
+        exitAbruptly();  // крестик → RST
     }
 }

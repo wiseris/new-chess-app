@@ -44,6 +44,7 @@ import static com.nargiz.chess.shared.models.enums.FigureType.PAWN;
 public class GameController extends BaseController {
 
     public static final String FIGURE_ID = "FIGURE_ID";
+
     @Inject
     MainScreenController mainScreenController;
 
@@ -107,7 +108,6 @@ public class GameController extends BaseController {
                 setText((empty || historyData == null) ? null : historyData.notation());
             }
         });
-
     }
 
     private void createFigure(FigureData data) {
@@ -199,9 +199,16 @@ public class GameController extends BaseController {
 
     @FXML
     public void exit() {
-        tcpClient.stop();
+        System.out.println("Exit button clicked - sending FIN");
+        // Приводим к реализации для вызова exitGracefully()
+        if (tcpClient instanceof com.nargiz.chess.client.network.impl.TCPClientImpl) {
+            ((com.nargiz.chess.client.network.impl.TCPClientImpl) tcpClient).exitGracefully();
+        } else {
+            tcpClient.stop();
+        }
         navigateTo(mainScreenController);
     }
+
     private void resizeBoard(double width, double height) {
         double scaleX = width / baseSceneSizeX;
         double scaleY = height / baseSceneSizeY;
@@ -273,7 +280,6 @@ public class GameController extends BaseController {
     }
 
     private boolean isMyTurn() {
-
         HistoryData lastAction = history.getItems().isEmpty() ? null : history.getItems().getLast();
         return (WHITE.equals(playerColor) && lastAction == null)
                 || (lastAction != null && !lastAction.getColor().equals(playerColor));
@@ -319,5 +325,4 @@ public class GameController extends BaseController {
             }
         });
     }
-
 }
